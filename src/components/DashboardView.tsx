@@ -514,8 +514,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {c.opcao_mei ? 'MEI' : 'SIMPLES'}
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                        NÃO OPTANTE
+                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        NÃO OPTANTE (FORA DO SIMPLES)
                       </span>
                     )}
                   </td>
@@ -613,8 +613,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               {c.opcao_mei ? 'MEI / SIMEI' : 'OPTANTE SIMPLES'}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                              NÃO OPTANTE
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                              NÃO OPTANTE (FORA DO SIMPLES)
                             </span>
                           )}
                         </td>

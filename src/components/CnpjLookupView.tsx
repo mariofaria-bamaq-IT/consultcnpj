@@ -367,7 +367,7 @@ export const CnpjLookupView: React.FC<CnpjLookupViewProps> = ({
                       <span className={`text-sm font-black ${
                         company.opcao_simples ? 'text-emerald-800' : 'text-slate-600'
                       }`}>
-                        {company.opcao_simples ? 'OPTANTE PELO SIMPLES' : 'NÃO OPTANTE'}
+                        {company.opcao_simples ? 'OPTANTE PELO SIMPLES' : 'NÃO OPTANTE (FORA DO SIMPLES)'}
                       </span>
                     </div>
                     {company.opcao_simples && company.data_opcao_simples ? (
@@ -395,7 +395,7 @@ export const CnpjLookupView: React.FC<CnpjLookupViewProps> = ({
                       <span className={`text-sm font-black ${
                         company.opcao_mei ? 'text-purple-900' : 'text-slate-600'
                       }`}>
-                        {company.opcao_mei ? 'OPTANTE PELO MEI (SIMEI)' : 'NÃO OPTANTE'}
+                        {company.opcao_mei ? 'OPTANTE PELO MEI (SIMEI)' : 'NÃO OPTANTE (NÃO É MEI)'}
                       </span>
                     </div>
                     {company.opcao_mei && company.data_opcao_mei ? (
@@ -405,6 +405,7 @@ export const CnpjLookupView: React.FC<CnpjLookupViewProps> = ({
                     )}
                   </div>
                 </div>
+
 
 
               </div>
