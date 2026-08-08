@@ -33,10 +33,9 @@ app.use(async (req, res, next) => {
     next();
   } catch (err: any) {
     console.error('Erro na inicialização do Banco SQLite:', err);
-    res.status(500).json({ error: `Erro de conexão ao banco de dados SQLite local: ${err?.message || err}` });
+    res.status(500).json({ error: `Erro de conexão ao banco de dados SQLite: ${err?.message || err}` });
   }
 });
-
 
 // ----------------------- API ROUTES -----------------------
 
@@ -49,7 +48,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/stats', async (req, res) => {
   try {
     const db = await getDb();
-    const companies = getAllCompanies(db);
+    const companies = await getAllCompanies(db);
 
     const total = companies.length;
     const ativas = companies.filter(c => c.situacao_cadastral === 'ATIVA').length;
@@ -66,14 +65,14 @@ app.get('/api/stats', async (req, res) => {
       distribuicao_uf[uf] = (distribuicao_uf[uf] || 0) + 1;
     });
 
-    const logs = getQueryLogs(db, 100);
+    const logs = await getQueryLogs(db, 100);
     const hojeStr = new Date().toISOString().slice(0, 10);
     const mesStr = new Date().toISOString().slice(0, 7);
 
     const consultas_hoje = logs.filter(l => l.data_consulta?.startsWith(hojeStr)).length;
     const consultas_mes = logs.filter(l => l.data_consulta?.startsWith(mesStr)).length;
 
-    const syncLogs = getSyncLogs(db, 1);
+    const syncLogs = await getSyncLogs(db, 1);
     const ultimoSync = syncLogs[0]?.data_sync || new Date().toISOString();
 
     res.json({
@@ -93,8 +92,8 @@ app.get('/api/stats', async (req, res) => {
         pendentes_count: companies.filter(c => c.status_sincronizacao === 'PENDENTE').length,
         total_registros: total,
         hash_local: `SQLITE_MD5_${total}_${Date.now().toString(36).toUpperCase()}`,
-        hash_nuvem: `SQLITE_MD5_${total}_GDRIVE_VAULT`,
-        mensagem: 'Banco de dados sincronizado'
+        hash_nuvem: `SQLITE_MD5_${total}_TURSO_CLOUD`,
+        mensagem: 'Banco SQLite em Nuvem Corporativa Ativo'
       }
     });
   } catch (err: any) {
@@ -111,7 +110,7 @@ app.get('/api/companies', async (req, res) => {
     const porte = req.query.porte as string;
     const situacao = req.query.situacao as string;
 
-    const companies = getAllCompanies(db, { search, uf, porte, situacao });
+    const companies = await getAllCompanies(db, { search, uf, porte, situacao });
     res.json(companies);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -122,7 +121,7 @@ app.get('/api/companies', async (req, res) => {
 app.get('/api/companies/:cnpj', async (req, res) => {
   try {
     const db = await getDb();
-    const company = getCompanyByCnpj(db, req.params.cnpj);
+    const company = await getCompanyByCnpj(db, req.params.cnpj);
     if (!company) {
       return res.status(404).json({ error: 'Empresa não encontrada no banco de dados' });
     }
@@ -146,7 +145,7 @@ app.post('/api/companies', async (req, res) => {
     company.data_consulta = company.data_consulta || new Date().toISOString();
     company.status_sincronizacao = 'PENDENTE';
 
-    saveCompanyToDb(db, company);
+    await saveCompanyToDb(db, company);
 
     res.json({ message: 'Empresa salva com sucesso', company });
   } catch (err: any) {
@@ -158,7 +157,7 @@ app.post('/api/companies', async (req, res) => {
 app.delete('/api/companies/:cnpj', async (req, res) => {
   try {
     const db = await getDb();
-    deleteCompanyByCnpj(db, req.params.cnpj);
+    await deleteCompanyByCnpj(db, req.params.cnpj);
     res.json({ message: 'Empresa removida com sucesso' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -169,7 +168,7 @@ app.delete('/api/companies/:cnpj', async (req, res) => {
 app.post('/api/companies/clear-all', async (req, res) => {
   try {
     const db = await getDb();
-    clearAllCompanies(db);
+    await clearAllCompanies(db);
     res.json({ message: 'Todas as empresas foram removidas com sucesso.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -185,7 +184,7 @@ app.get('/api/cnpj/lookup/:cnpj', async (req, res) => {
     res.json(result);
   } catch (err: any) {
     const db = await getDb();
-    logQuery(db, {
+    await logQuery(db, {
       cnpj: req.params.cnpj,
       fonte: 'CNPJA_API',
       status: 'ERRO',
@@ -245,23 +244,24 @@ app.post('/api/import/excel', upload.single('file'), async (req, res) => {
     let ignorados = 0;
     const erros: string[] = [];
 
-    rawRows.forEach((row, idx) => {
+    for (let idx = 0; idx < rawRows.length; idx++) {
+      const row = rawRows[idx];
       const rawCnpj = String(row.cnpj || row.CNPJ || row['Cnpj'] || row['CNPJ/CPF'] || '').replace(/\D/g, '');
       const razaoSocial = String(row.razao_social || row['Razão Social'] || row['RAZAO SOCIAL'] || row['Razao Social'] || row['Empresa'] || row['Nome'] || '').trim();
 
       if (!rawCnpj || rawCnpj.length !== 14) {
         ignorados++;
         erros.push(`Linha ${idx + 2}: CNPJ "${rawCnpj}" inválido ou ausente.`);
-        return;
+        continue;
       }
 
       if (!razaoSocial) {
         ignorados++;
         erros.push(`Linha ${idx + 2}: Razão Social não especificada para o CNPJ ${rawCnpj}.`);
-        return;
+        continue;
       }
 
-      const existing = getCompanyByCnpj(db, rawCnpj);
+      const existing = await getCompanyByCnpj(db, rawCnpj);
 
       const newCompany: Company = {
         cnpj: rawCnpj,
@@ -297,10 +297,10 @@ app.post('/api/import/excel', upload.single('file'), async (req, res) => {
         importados++;
       }
 
-      saveCompanyToDb(db, newCompany);
-    });
+      await saveCompanyToDb(db, newCompany);
+    }
 
-    logSync(db, {
+    await logSync(db, {
       tipo: 'MANUAL',
       status: 'CONCLUIDO',
       registros_afetados: importados + atualizados,
@@ -384,15 +384,15 @@ app.post('/api/cnpj/batch-lookup', async (req, res) => {
 app.post('/api/sync/trigger', async (req, res) => {
   try {
     const db = await getDb();
-    const companies = getAllCompanies(db);
-    companies.forEach(c => {
+    const companies = await getAllCompanies(db);
+    for (const c of companies) {
       if (c.status_sincronizacao === 'PENDENTE') {
         c.status_sincronizacao = 'SINCRONIZADO';
-        saveCompanyToDb(db, c);
+        await saveCompanyToDb(db, c);
       }
-    });
+    }
 
-    logSync(db, {
+    await logSync(db, {
       tipo: 'MANUAL',
       status: 'CONCLUIDO',
       registros_afetados: companies.length,
@@ -413,7 +413,8 @@ app.post('/api/sync/trigger', async (req, res) => {
 app.get('/api/logs', async (req, res) => {
   try {
     const db = await getDb();
-    res.json(getQueryLogs(db, 100));
+    const logs = await getQueryLogs(db, 100);
+    res.json(logs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -422,7 +423,8 @@ app.get('/api/logs', async (req, res) => {
 app.get('/api/sync/logs', async (req, res) => {
   try {
     const db = await getDb();
-    res.json(getSyncLogs(db, 50));
+    const logs = await getSyncLogs(db, 50);
+    res.json(logs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

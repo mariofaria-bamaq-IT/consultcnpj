@@ -1,30 +1,28 @@
-import { Database } from 'sql.js';
 import { Company } from '../src/types.js';
 import { getCompanyByCnpj, saveCompanyToDb, logQuery, parseBooleanValue } from './db.js';
 
-
-export async function consultarCnpj(database: Database, cnpjInput: string, forceRefresh = false): Promise<{ company: Company; fonte: 'CNPJA_API' | 'CACHE_SQLITE' | 'RECEITA_FALLBACK' }> {
+export async function consultarCnpj(database: any, cnpjInput: string, forceRefresh = false): Promise<{ company: Company; fonte: 'CNPJA_API' | 'CACHE_SQLITE' | 'RECEITA_FALLBACK' }> {
   const cleanCnpj = cnpjInput.replace(/\D/g, '');
 
   if (cleanCnpj.length !== 14) {
     throw new Error('CNPJ inválido. O CNPJ deve conter exatamente 14 dígitos numéricos.');
   }
 
-  // 1. Verificar cache local no SQLite se não for forçado
+  // 1. Verificar cache local/nuvem no SQLite se não for forçado
   if (!forceRefresh) {
-    const cachedCompany = getCompanyByCnpj(database, cleanCnpj);
+    const cachedCompany = await getCompanyByCnpj(database, cleanCnpj);
     if (cachedCompany) {
       const maxAgeDays = Number(process.env.DEFAULT_MAX_AGE_DAYS) || 45;
       const consultaDate = new Date(cachedCompany.data_consulta || cachedCompany.ultima_atualizacao);
       const diffDays = (new Date().getTime() - consultaDate.getTime()) / (1000 * 3600 * 24);
 
       if (diffDays < maxAgeDays) {
-        logQuery(database, {
+        await logQuery(database, {
           cnpj: cleanCnpj,
           razao_social: cachedCompany.razao_social,
           fonte: 'CACHE_SQLITE',
           status: 'SUCESSO',
-          detalhe: `Dados obtidos do banco SQLite local (Cache de ${Math.round(diffDays)} dias)`
+          detalhe: `Dados obtidos do banco SQLite (Cache de ${Math.round(diffDays)} dias)`
         });
         return { company: cachedCompany, fonte: 'CACHE_SQLITE' };
       }
@@ -48,9 +46,9 @@ export async function consultarCnpj(database: Database, cnpjInput: string, force
       if (response.ok) {
         const data = await response.json();
         const company = mapCnpjaToCompany(data, cleanCnpj);
-        saveCompanyToDb(database, company);
+        await saveCompanyToDb(database, company);
 
-        logQuery(database, {
+        await logQuery(database, {
           cnpj: cleanCnpj,
           razao_social: company.razao_social,
           fonte: 'CNPJA_API',
@@ -74,9 +72,9 @@ export async function consultarCnpj(database: Database, cnpjInput: string, force
     if (res.ok) {
       const data = await res.json();
       const company = mapMinhaReceitaToCompany(data, cleanCnpj);
-      saveCompanyToDb(database, company);
+      await saveCompanyToDb(database, company);
 
-      logQuery(database, {
+      await logQuery(database, {
         cnpj: cleanCnpj,
         razao_social: company.razao_social,
         fonte: 'RECEITA_FALLBACK',
@@ -92,9 +90,9 @@ export async function consultarCnpj(database: Database, cnpjInput: string, force
 
   // 4. Se for um CNPJ conhecido ou se o fallback falhar, gera estrutura sintética válida
   const syntheticCompany = generateSyntheticCompany(cleanCnpj);
-  saveCompanyToDb(database, syntheticCompany);
+  await saveCompanyToDb(database, syntheticCompany);
 
-  logQuery(database, {
+  await logQuery(database, {
     cnpj: cleanCnpj,
     razao_social: syntheticCompany.razao_social,
     fonte: 'RECEITA_FALLBACK',
@@ -179,7 +177,6 @@ function mapMinhaReceitaToCompany(data: any, cleanCnpj: string): Company {
     data_opcao_simples: data.data_opcao_pelo_simples || '',
     opcao_mei: parseBooleanValue(data.opcao_pelo_mei),
     data_opcao_mei: data.data_opcao_pelo_mei || '',
-
     qsa: (data.qsa || []).map((q: any) => ({
       nome: q.nome_socio || q.nome,
       qualificacao: q.qualificacao_socio || 'Sócio'
