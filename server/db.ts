@@ -4,7 +4,7 @@ import path from 'path';
 import { Company, QueryLog, SyncLogEntry, CloudSyncStatus } from '../src/types.js';
 
 let db: Database | null = null;
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL ? '/tmp' : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'app.sqlite');
 
 export async function getDb(): Promise<Database> {
