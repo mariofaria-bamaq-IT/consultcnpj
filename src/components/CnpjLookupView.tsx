@@ -406,6 +406,7 @@ export const CnpjLookupView: React.FC<CnpjLookupViewProps> = ({
                   </div>
                 </div>
 
+
               </div>
             </div>
 
