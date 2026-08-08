@@ -7,14 +7,40 @@ let db: Database | null = null;
 const DATA_DIR = process.env.VERCEL ? '/tmp' : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'app.sqlite');
 
+async function createSqlInstance(): Promise<any> {
+  try {
+    const wasmPath = path.resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
+    if (fs.existsSync(wasmPath)) {
+      const wasmBinary = fs.readFileSync(wasmPath);
+      return await initSqlJs({ wasmBinary });
+    }
+  } catch (err) {
+    console.warn('Falha ao carregar WASM local do sql.js:', err);
+  }
+
+  try {
+    return await initSqlJs({
+      locateFile: file => `https://sql.js.org/dist/${file}`
+    });
+  } catch (err) {
+    console.warn('Falha no fallback CDN do sql.js:', err);
+  }
+
+  return await initSqlJs();
+}
+
 export async function getDb(): Promise<Database> {
   if (db) return db;
 
   if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } catch (e) {
+      console.warn('Não foi possível criar diretório de dados:', e);
+    }
   }
 
-  const SQL = await initSqlJs();
+  const SQL = await createSqlInstance();
 
   if (fs.existsSync(DB_FILE)) {
     try {
@@ -34,6 +60,7 @@ export async function getDb(): Promise<Database> {
   saveDb();
   return db;
 }
+
 
 export function saveDb() {
   if (!db) return;

@@ -33,9 +33,10 @@ app.use(async (req, res, next) => {
     next();
   } catch (err: any) {
     console.error('Erro na inicialização do Banco SQLite:', err);
-    res.status(500).json({ error: 'Erro de conexão ao banco de dados SQLite local' });
+    res.status(500).json({ error: `Erro de conexão ao banco de dados SQLite local: ${err?.message || err}` });
   }
 });
+
 
 // ----------------------- API ROUTES -----------------------
 
