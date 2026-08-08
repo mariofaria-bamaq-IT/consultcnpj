@@ -134,7 +134,7 @@ export default function App() {
       />
 
       {/* Main Body Layout with Sidebar and Content */}
-      <div className="flex-1 max-w-[1750px] w-full mx-auto flex flex-col md:flex-row">
+      <div className="flex-1 max-w-[1920px] w-full mx-auto flex flex-col md:flex-row">
         
         {/* Left Navigation Sidebar */}
         <Sidebar
