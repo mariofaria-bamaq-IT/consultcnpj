@@ -1,22 +1,37 @@
 import initSqlJs, { Database } from 'sql.js';
-import { createClient, Client } from '@libsql/client';
+import { createClient as createTursoClient, Client as TursoClient } from '@libsql/client';
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { Company, QueryLog, SyncLogEntry } from '../src/types.js';
 
 let db: Database | null = null;
-let libsql: Client | null = null;
+let libsql: TursoClient | null = null;
+let supabase: SupabaseClient | null = null;
 
 const DATA_DIR = process.env.VERCEL ? '/tmp' : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'app.sqlite');
 
-// Initialize Turso Cloud SQLite if environment variables are provided
+// 1. Check Supabase credentials
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (supabaseUrl && supabaseKey) {
+  try {
+    supabase = createSupabaseClient(supabaseUrl, supabaseKey);
+    console.log('⚡ Conectado ao Supabase em Nuvem:', supabaseUrl);
+  } catch (err) {
+    console.error('Erro ao conectar ao Supabase:', err);
+  }
+}
+
+// 2. Check Turso credentials
 const tursoUrl = process.env.TURSO_DATABASE_URL || process.env.LIBSQL_URL;
 const tursoToken = process.env.TURSO_AUTH_TOKEN || process.env.LIBSQL_AUTH_TOKEN;
 
-if (tursoUrl) {
+if (!supabase && tursoUrl) {
   try {
-    libsql = createClient({
+    libsql = createTursoClient({
       url: tursoUrl,
       authToken: tursoToken
     });
@@ -58,6 +73,8 @@ async function createSqlInstance(): Promise<any> {
 }
 
 export async function getDb(): Promise<any> {
+  if (supabase) return supabase;
+
   if (libsql) {
     await initTursoTables(libsql);
     return libsql;
@@ -105,7 +122,7 @@ export function saveDb() {
   }
 }
 
-async function initTursoTables(client: Client) {
+async function initTursoTables(client: TursoClient) {
   try {
     await client.execute(`
       CREATE TABLE IF NOT EXISTS companies (
@@ -164,15 +181,8 @@ async function initTursoTables(client: Client) {
         mensagem TEXT
       );
     `);
-
-    await client.execute(`
-      CREATE TABLE IF NOT EXISTS system_config (
-        key TEXT PRIMARY KEY,
-        value TEXT
-      );
-    `);
   } catch (e) {
-    console.error('Erro ao inicializar tabelas no Turso SQLite Cloud:', e);
+    console.error('Erro ao inicializar tabelas no Turso:', e);
   }
 }
 
@@ -229,17 +239,50 @@ function initTables(database: Database) {
       registros_afetados INTEGER,
       mensagem TEXT
     );
-
-    CREATE TABLE IF NOT EXISTS system_config (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
   `);
 }
 
 export async function saveCompanyToDb(database: any, company: Company) {
   const qsaJson = company.qsa ? JSON.stringify(company.qsa) : null;
   const atividadesSecJson = company.atividades_secundarias ? JSON.stringify(company.atividades_secundarias) : null;
+
+  if (supabase) {
+    const row = {
+      cnpj: company.cnpj.replace(/\D/g, ''),
+      razao_social: company.razao_social,
+      nome_fantasia: company.nome_fantasia || '',
+      situacao_cadastral: company.situacao_cadastral || 'ATIVA',
+      data_situacao_cadastral: company.data_situacao_cadastral || '',
+      data_abertura: company.data_abertura || '',
+      porte: company.porte || 'DEMAIS',
+      natureza_juridica: company.natureza_juridica || '',
+      cnae_principal_codigo: company.cnae_principal_codigo || '',
+      cnae_principal_descricao: company.cnae_principal_descricao || '',
+      atividades_secundarias: atividadesSecJson,
+      logradouro: company.logradouro || '',
+      numero: company.numero || '',
+      complemento: company.complemento || '',
+      bairro: company.bairro || '',
+      municipio: company.municipio || '',
+      uf: company.uf || '',
+      cep: company.cep || '',
+      email: company.email || '',
+      telefone: company.telefone || '',
+      capital_social: company.capital_social || 0,
+      opcao_simples: company.opcao_simples ? 1 : 0,
+      data_opcao_simples: company.data_opcao_simples || '',
+      opcao_mei: company.opcao_mei ? 1 : 0,
+      data_opcao_mei: company.data_opcao_mei || '',
+      qsa: qsaJson,
+      origem: company.origem || 'MANUAL',
+      data_consulta: company.data_consulta || new Date().toISOString(),
+      status_sincronizacao: company.status_sincronizacao || 'SINCRONIZADO',
+      ultima_atualizacao: new Date().toISOString()
+    };
+    const { error } = await supabase.from('companies').upsert(row, { onConflict: 'cnpj' });
+    if (error) console.error('Erro no Supabase saveCompanyToDb:', error.message);
+    return;
+  }
 
   const sql = `
     INSERT OR REPLACE INTO companies (
@@ -299,6 +342,32 @@ export async function saveCompanyToDb(database: any, company: Company) {
 }
 
 export async function getAllCompanies(database: any, filters?: { search?: string; uf?: string; porte?: string; situacao?: string }): Promise<Company[]> {
+  if (supabase) {
+    let query = supabase.from('companies').select('*');
+
+    if (filters?.uf) {
+      query = query.eq('uf', filters.uf);
+    }
+    if (filters?.porte) {
+      query = query.eq('porte', filters.porte);
+    }
+    if (filters?.situacao) {
+      query = query.eq('situacao_cadastral', filters.situacao);
+    }
+    if (filters?.search) {
+      query = query.or(`cnpj.ilike.%${filters.search}%,razao_social.ilike.%${filters.search}%,nome_fantasia.ilike.%${filters.search}%,municipio.ilike.%${filters.search}%`);
+    }
+
+    query = query.order('razao_social', { ascending: true });
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Erro ao buscar empresas no Supabase:', error.message);
+      return [];
+    }
+    return (data || []).map(row => parseCompanyRow(row));
+  }
+
   let sql = `SELECT * FROM companies WHERE 1=1`;
   const params: any[] = [];
 
@@ -343,6 +412,13 @@ export async function getAllCompanies(database: any, filters?: { search?: string
 
 export async function getCompanyByCnpj(database: any, cnpj: string): Promise<Company | null> {
   const cleanCnpj = cnpj.replace(/\D/g, '');
+
+  if (supabase) {
+    const { data, error } = await supabase.from('companies').select('*').eq('cnpj', cleanCnpj).maybeSingle();
+    if (error || !data) return null;
+    return parseCompanyRow(data);
+  }
+
   const sql = `SELECT * FROM companies WHERE cnpj = ?`;
 
   if (libsql) {
@@ -367,6 +443,12 @@ export async function getCompanyByCnpj(database: any, cnpj: string): Promise<Com
 
 export async function deleteCompanyByCnpj(database: any, cnpj: string): Promise<boolean> {
   const cleanCnpj = cnpj.replace(/\D/g, '');
+
+  if (supabase) {
+    await supabase.from('companies').delete().eq('cnpj', cleanCnpj);
+    return true;
+  }
+
   const sql = `DELETE FROM companies WHERE cnpj = ?`;
 
   if (libsql) {
@@ -379,6 +461,11 @@ export async function deleteCompanyByCnpj(database: any, cnpj: string): Promise<
 }
 
 export async function clearAllCompanies(database: any): Promise<boolean> {
+  if (supabase) {
+    await supabase.from('companies').delete().neq('cnpj', '');
+    return true;
+  }
+
   const sql = `DELETE FROM companies`;
   if (libsql) {
     await libsql.execute(sql);
@@ -400,7 +487,7 @@ function parseCompanyRow(row: any): Company {
   }
 
   try {
-    if (row.atividades_secundarias) actividades = typeof row.atividades_secundarias === 'string' ? JSON.parse(row.atividades_secundarias) : row.atividades_secundarias;
+    if (row.atividades_secundarias) atividades = typeof row.atividades_secundarias === 'string' ? JSON.parse(row.atividades_secundarias) : row.atividades_secundarias;
   } catch (e) {
     atividades = [];
   }
@@ -440,6 +527,18 @@ function parseCompanyRow(row: any): Company {
 }
 
 export async function logQuery(database: any, log: { cnpj: string; razao_social?: string; fonte: string; status: string; detalhe: string }) {
+  if (supabase) {
+    await supabase.from('query_logs').insert({
+      cnpj: log.cnpj,
+      razao_social: log.razao_social || '',
+      data_consulta: new Date().toISOString(),
+      fonte: log.fonte,
+      status: log.status,
+      detalhe: log.detalhe
+    });
+    return;
+  }
+
   const sql = `
     INSERT INTO query_logs (cnpj, razao_social, data_consulta, fonte, status, detalhe)
     VALUES (?, ?, ?, ?, ?, ?)
@@ -462,6 +561,19 @@ export async function logQuery(database: any, log: { cnpj: string; razao_social?
 }
 
 export async function getQueryLogs(database: any, limit = 50): Promise<QueryLog[]> {
+  if (supabase) {
+    const { data } = await supabase.from('query_logs').select('*').order('id', { ascending: false }).limit(limit);
+    return (data || []).map(row => ({
+      id: Number(row.id),
+      cnpj: String(row.cnpj || ''),
+      razao_social: String(row.razao_social || ''),
+      data_consulta: String(row.data_consulta || ''),
+      fonte: row.fonte as any,
+      status: row.status as any,
+      detalhe: String(row.detalhe || '')
+    }));
+  }
+
   const sql = `SELECT * FROM query_logs ORDER BY id DESC LIMIT ?`;
   if (libsql) {
     const res = await libsql.execute({ sql, args: [limit] });
@@ -497,6 +609,17 @@ export async function getQueryLogs(database: any, limit = 50): Promise<QueryLog[
 }
 
 export async function logSync(database: any, sync: { tipo: string; status: string; registros_afetados: number; mensagem: string }) {
+  if (supabase) {
+    await supabase.from('sync_logs').insert({
+      data_sync: new Date().toISOString(),
+      tipo: sync.tipo,
+      status: sync.status,
+      registros_afetados: sync.registros_afetados,
+      mensagem: sync.mensagem
+    });
+    return;
+  }
+
   const sql = `
     INSERT INTO sync_logs (data_sync, tipo, status, registros_afetados, mensagem)
     VALUES (?, ?, ?, ?, ?)
@@ -511,18 +634,25 @@ export async function logSync(database: any, sync: { tipo: string; status: strin
 
   if (libsql) {
     await libsql.execute({ sql, args });
-    await libsql.execute({
-      sql: `INSERT OR REPLACE INTO system_config (key, value) VALUES ('ultimo_sync', ?)`,
-      args: [new Date().toISOString()]
-    });
   } else if (db) {
     db.run(sql, args);
-    db.run(`UPDATE system_config SET value = ? WHERE key = 'ultimo_sync'`, [new Date().toISOString()]);
     saveDb();
   }
 }
 
 export async function getSyncLogs(database: any, limit = 20): Promise<SyncLogEntry[]> {
+  if (supabase) {
+    const { data } = await supabase.from('sync_logs').select('*').order('id', { ascending: false }).limit(limit);
+    return (data || []).map(row => ({
+      id: Number(row.id),
+      data_sync: String(row.data_sync || ''),
+      tipo: row.tipo as any,
+      status: row.status as any,
+      registros_afetados: Number(row.registros_afetados || 0),
+      mensagem: String(row.mensagem || '')
+    }));
+  }
+
   const sql = `SELECT * FROM sync_logs ORDER BY id DESC LIMIT ?`;
   if (libsql) {
     const res = await libsql.execute({ sql, args: [limit] });
