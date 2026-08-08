@@ -7,6 +7,16 @@ let db: Database | null = null;
 const DATA_DIR = process.env.VERCEL ? '/tmp' : path.resolve(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'app.sqlite');
 
+export function parseBooleanValue(val: any): boolean {
+  if (val === true || val === 1 || val === '1') return true;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    return s === 'true' || s === 'sim' || s === 'optante' || s === 's';
+  }
+  return false;
+}
+
+
 async function createSqlInstance(): Promise<any> {
   try {
     const wasmPath = path.resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
@@ -548,10 +558,11 @@ function parseCompanyRow(row: any): Company {
     email: row.email || '',
     telefone: row.telefone || '',
     capital_social: Number(row.capital_social) || 0,
-    opcao_simples: Boolean(row.opcao_simples),
+    opcao_simples: parseBooleanValue(row.opcao_simples),
     data_opcao_simples: row.data_opcao_simples || '',
-    opcao_mei: Boolean(row.opcao_mei),
+    opcao_mei: parseBooleanValue(row.opcao_mei),
     data_opcao_mei: row.data_opcao_mei || '',
+
     qsa: qsa,
     origem: row.origem || 'MANUAL',
     data_consulta: row.data_consulta || '',

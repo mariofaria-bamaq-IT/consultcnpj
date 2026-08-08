@@ -7,6 +7,7 @@ import {
   Briefcase,
   FileText,
   CheckCircle2,
+  XCircle,
   AlertCircle,
   Copy,
   Check,
@@ -342,43 +343,72 @@ export const CnpjLookupView: React.FC<CnpjLookupViewProps> = ({
 
             {/* Grid 1.5: Regime Tributário (Simples Nacional & MEI) */}
             <div>
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-emerald-600" />
+              <h4 className="text-xs font-extrabold text-purple-950 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-purple-700" />
                 <span>Regime Tributário (Simples Nacional & MEI)</span>
               </h4>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm bg-emerald-50/50 border border-emerald-200 p-4 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <div className={`p-2 rounded-lg ${company.opcao_simples ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                    <CheckCircle2 className="w-5 h-5" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                
+                {/* Box Simples Nacional */}
+                <div className={`p-4 rounded-xl border transition flex items-start space-x-3.5 ${
+                  company.opcao_simples
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <div className={`p-2.5 rounded-xl ${
+                    company.opcao_simples ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {company.opcao_simples ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">Simples Nacional</span>
-                    <span className={`text-sm font-bold ${company.opcao_simples ? 'text-emerald-800' : 'text-slate-700'}`}>
-                      {company.opcao_simples ? 'OPTANTE PELO SIMPLES' : 'NÃO OPTANTE'}
-                    </span>
-                    {company.opcao_simples && company.data_opcao_simples && (
-                      <p className="text-xs text-emerald-700 mt-0.5">Desde: {company.data_opcao_simples}</p>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Simples Nacional</span>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <span className={`text-sm font-black ${
+                        company.opcao_simples ? 'text-emerald-800' : 'text-slate-600'
+                      }`}>
+                        {company.opcao_simples ? 'OPTANTE PELO SIMPLES' : 'NÃO OPTANTE'}
+                      </span>
+                    </div>
+                    {company.opcao_simples && company.data_opcao_simples ? (
+                      <p className="text-xs text-emerald-700 mt-1 font-medium">Desde: {company.data_opcao_simples}</p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 mt-0.5">Empresa não optante pelo Simples Nacional</p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-3">
-                  <div className={`p-2 rounded-lg ${company.opcao_mei ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                    <Users className="w-5 h-5" />
+                {/* Box MEI / SIMEI */}
+                <div className={`p-4 rounded-xl border transition flex items-start space-x-3.5 ${
+                  company.opcao_mei
+                    ? 'bg-purple-50 border-purple-300 text-purple-950'
+                    : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <div className={`p-2.5 rounded-xl ${
+                    company.opcao_mei ? 'bg-purple-700 text-white shadow-sm' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {company.opcao_mei ? <Users className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider block">Microempreendedor Individual (MEI / SIMEI)</span>
-                    <span className={`text-sm font-bold ${company.opcao_mei ? 'text-blue-800' : 'text-slate-700'}`}>
-                      {company.opcao_mei ? 'OPTANTE PELO MEI (SIMEI)' : 'NÃO OPTANTE'}
-                    </span>
-                    {company.opcao_mei && company.data_opcao_mei && (
-                      <p className="text-xs text-blue-700 mt-0.5">Desde: {company.data_opcao_mei}</p>
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Microempreendedor Individual (MEI / SIMEI)</span>
+                    <div className="flex items-center space-x-2 mt-0.5">
+                      <span className={`text-sm font-black ${
+                        company.opcao_mei ? 'text-purple-900' : 'text-slate-600'
+                      }`}>
+                        {company.opcao_mei ? 'OPTANTE PELO MEI (SIMEI)' : 'NÃO OPTANTE'}
+                      </span>
+                    </div>
+                    {company.opcao_mei && company.data_opcao_mei ? (
+                      <p className="text-xs text-purple-700 mt-1 font-medium">Desde: {company.data_opcao_mei}</p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 mt-0.5">Empresa não enquadrada como MEI</p>
                     )}
                   </div>
                 </div>
+
               </div>
             </div>
+
 
             {/* Grid 2: Atividades Econômicas (CNAE) */}
             <div>

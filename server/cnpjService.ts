@@ -1,6 +1,7 @@
 import { Database } from 'sql.js';
 import { Company } from '../src/types.js';
-import { getCompanyByCnpj, saveCompanyToDb, logQuery } from './db.js';
+import { getCompanyByCnpj, saveCompanyToDb, logQuery, parseBooleanValue } from './db.js';
+
 
 export async function consultarCnpj(database: Database, cnpjInput: string, forceRefresh = false): Promise<{ company: Company; fonte: 'CNPJA_API' | 'CACHE_SQLITE' | 'RECEITA_FALLBACK' }> {
   const cleanCnpj = cnpjInput.replace(/\D/g, '');
@@ -133,9 +134,9 @@ function mapCnpjaToCompany(data: any, cleanCnpj: string): Company {
     email: data.emails?.[0]?.address || '',
     telefone: data.phones?.[0] ? `(${data.phones[0].area}) ${data.phones[0].number}` : '',
     capital_social: data.company?.equity || 0,
-    opcao_simples: Boolean(simplesObj?.optant),
+    opcao_simples: parseBooleanValue(simplesObj?.optant),
     data_opcao_simples: simplesObj?.since || '',
-    opcao_mei: Boolean(simeiObj?.optant),
+    opcao_mei: parseBooleanValue(simeiObj?.optant),
     data_opcao_mei: simeiObj?.since || '',
     qsa: (data.company?.members || []).map((m: any) => ({
       nome: m.person?.name || m.name,
@@ -174,10 +175,11 @@ function mapMinhaReceitaToCompany(data: any, cleanCnpj: string): Company {
     email: data.email || '',
     telefone: data.ddd_telefone_1 ? `(${data.ddd_telefone_1.slice(0, 2)}) ${data.ddd_telefone_1.slice(2)}` : '',
     capital_social: Number(data.capital_social) || 0,
-    opcao_simples: Boolean(data.opcao_pelo_simples),
+    opcao_simples: parseBooleanValue(data.opcao_pelo_simples),
     data_opcao_simples: data.data_opcao_pelo_simples || '',
-    opcao_mei: Boolean(data.opcao_pelo_mei),
+    opcao_mei: parseBooleanValue(data.opcao_pelo_mei),
     data_opcao_mei: data.data_opcao_pelo_mei || '',
+
     qsa: (data.qsa || []).map((q: any) => ({
       nome: q.nome_socio || q.nome,
       qualificacao: q.qualificacao_socio || 'Sócio'
