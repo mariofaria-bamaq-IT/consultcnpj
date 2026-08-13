@@ -343,29 +343,50 @@ export async function saveCompanyToDb(database: any, company: Company) {
 
 export async function getAllCompanies(database: any, filters?: { search?: string; uf?: string; porte?: string; situacao?: string }): Promise<Company[]> {
   if (supabase) {
-    let query = supabase.from('companies').select('*');
+    const allRows: any[] = [];
+    let page = 0;
+    const pageSize = 1000;
+    let keepFetching = true;
 
-    if (filters?.uf) {
-      query = query.eq('uf', filters.uf);
-    }
-    if (filters?.porte) {
-      query = query.eq('porte', filters.porte);
-    }
-    if (filters?.situacao) {
-      query = query.eq('situacao_cadastral', filters.situacao);
-    }
-    if (filters?.search) {
-      query = query.or(`cnpj.ilike.%${filters.search}%,razao_social.ilike.%${filters.search}%,nome_fantasia.ilike.%${filters.search}%,municipio.ilike.%${filters.search}%`);
+    while (keepFetching) {
+      let query = supabase.from('companies').select('*');
+
+      if (filters?.uf) {
+        query = query.eq('uf', filters.uf);
+      }
+      if (filters?.porte) {
+        query = query.eq('porte', filters.porte);
+      }
+      if (filters?.situacao) {
+        query = query.eq('situacao_cadastral', filters.situacao);
+      }
+      if (filters?.search) {
+        query = query.or(`cnpj.ilike.%${filters.search}%,razao_social.ilike.%${filters.search}%,nome_fantasia.ilike.%${filters.search}%,municipio.ilike.%${filters.search}%`);
+      }
+
+      query = query
+        .order('razao_social', { ascending: true })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('Erro ao buscar empresas no Supabase:', error.message);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allRows.push(...data);
+        if (data.length < pageSize) {
+          keepFetching = false;
+        } else {
+          page++;
+        }
+      } else {
+        keepFetching = false;
+      }
     }
 
-    query = query.order('razao_social', { ascending: true });
-
-    const { data, error } = await query;
-    if (error) {
-      console.error('Erro ao buscar empresas no Supabase:', error.message);
-      return [];
-    }
-    return (data || []).map(row => parseCompanyRow(row));
+    return allRows.map(row => parseCompanyRow(row));
   }
 
   let sql = `SELECT * FROM companies WHERE 1=1`;

@@ -44,7 +44,7 @@ export const CompanyManagerView: React.FC<CompanyManagerViewProps> = ({
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(25);
 
   // Unique UFs and Portes for filters
   const ufs = Array.from(new Set(companies.map(c => c.uf).filter(Boolean))).sort();
@@ -357,8 +357,28 @@ export const CompanyManagerView: React.FC<CompanyManagerViewProps> = ({
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
-          <span>Mostrando {paginated.length} de {filtered.length} empresas</span>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+          <div className="flex items-center space-x-3">
+            <span>Mostrando {paginated.length} de <strong>{filtered.length}</strong> empresas</span>
+            <div className="flex items-center space-x-1">
+              <span className="text-slate-400">Exibir:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-white border border-slate-300 text-slate-700 rounded px-2 py-0.5 font-semibold focus:outline-none"
+              >
+                <option value={10}>10 por pág.</option>
+                <option value={25}>25 por pág.</option>
+                <option value={50}>50 por pág.</option>
+                <option value={100}>100 por pág.</option>
+                <option value={500}>500 por pág.</option>
+                <option value={10000}>Todas ({filtered.length})</option>
+              </select>
+            </div>
+          </div>
 
           <div className="flex items-center space-x-2">
             <button
@@ -368,12 +388,10 @@ export const CompanyManagerView: React.FC<CompanyManagerViewProps> = ({
             >
               Anterior
             </button>
-            <span className="font-semibold text-slate-800">
-              Página {currentPage} de {totalPages}
-            </span>
+            <span className="font-semibold text-slate-700">Página {currentPage} de {totalPages}</span>
             <button
               onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
+              disabled={currentPage >= totalPages}
               className="px-3 py-1 bg-white border border-slate-300 rounded font-medium disabled:opacity-40 hover:bg-slate-100"
             >
               Próxima
